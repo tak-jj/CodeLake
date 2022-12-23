@@ -1,64 +1,69 @@
-import os, time, copy
+import time
+import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, device='cpu'):
+def train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs, device):
     since = time.time()
-    val_acc_history = []
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
+    best_metric = 0.0
+    best_model = None
+    metric_history = []
 
     for epoch in range(num_epochs):
-        print(f'Epoch {epoch + 1}/{num_epochs}')
-        print('-'*10)
+        print(f'Epoch {epoch}/{num_epochs - 1}')
+        model.train()
+        train_loss = []
+        for inputs, targets in tqdm(iter(train_loader)):
+            inputs = inputs.float().to(device)
+            targets = targets.to(device)
 
-        for phase in ['train', 'val']:
-            if phase == 'train':
-                model.train()
-                print('Training...')
-            else:
-                model.eval()
-                print('Validating...')
-            
-            running_loss = 0.0
-            running_corrects = 0
+            optimizer.zero_grad()
 
-            for inputs, labels in tqdm(dataloaders[phase]):
-                inputs = inputs.to(device)
-                labels = inputs.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
 
-                optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-                with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-                    
-                    _, preds = torch.max(outputs, 1)
+            train_loss.append(loss.item())
+        
+        tr_loss = np.mean(train_loss)
 
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
+        val_loss, val_metric = val_model(model, test_loader, criterion, device)
+        metric_history.append(val_metric)
 
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-            
-            epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
+        print(f'Epoch {epoch}, Train Loss: {tr_loss:.4f}, Val Loss: {val_loss:.4f}, Metric: {val_metric:.4f}')
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+        if val_metric > best_metric:
+            best_model = model
+            best_metric = val_metric
 
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
-            if phase == 'val':
-                val_acc_history.append(epoch_acc)
-        print()
-    
     time_elapsed = time.time() - since
     print('Train complete in {:0f}m {:0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val Acc: {:.4f}'.format(best_acc))
+    print('Best Metric: {:.4f}'.format(best_metric))
 
-    model.load_state_dict(best_model_wts)
+    return best_model, metric_history
 
-    return model, val_acc_history
+def val_model(model, test_loader, criterion, device):
+    model.eval()
+
+    model_preds = []
+    true_labels = []
+    val_loss = []
+
+    with torch.no_grad():
+        for inputs, targets in tqdm(iter(test_loader)):
+            inputs = inputs.to(device)
+            targets = targets.to(device)
+
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+
+            val_loss.append(loss.item())
+
+            model_preds += outputs.argmax(1).detach().cpu().numpy().tolist()
+            true_labels += targets.detach().cpu().numpy().tolist()
+    
+    val_metric = metric(true_labels, model_preds)
+    return np.mean(val_loss), val_metric
