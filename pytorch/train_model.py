@@ -2,6 +2,8 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
+
+from sklearn.metrics import f1_score
 from tqdm import tqdm
 
 def train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs, device):
@@ -22,6 +24,11 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, num_epoc
 
             outputs = model(inputs)
             loss = criterion(outputs, targets)
+            ### For inception v3
+            # outputs, aux_outputs = model(inputs)
+            # loss1 = criterion(outputs, targets)
+            # loss2 = criterion(aux_outputs, targets)
+            # loss = loss1 + 0.4*loss2
 
             loss.backward()
             optimizer.step()
@@ -45,6 +52,7 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, num_epoc
 
     return best_model, metric_history
 
+# F1 score
 def val_model(model, test_loader, criterion, device):
     model.eval()
 
@@ -65,5 +73,30 @@ def val_model(model, test_loader, criterion, device):
             model_preds += outputs.argmax(1).detach().cpu().numpy().tolist()
             true_labels += targets.detach().cpu().numpy().tolist()
     
-    val_metric = metric(true_labels, model_preds)
+    val_metric = f1_score(true_labels, model_preds, average='macro')
     return np.mean(val_loss), val_metric
+
+# Accuracy
+def val_model(model, test_loader, criterion, device):
+    model.eval()
+
+    total = 0
+    correct = 0
+    val_loss = []
+
+    with torch.no_grad():
+        for inputs, targets in tqdm(iter(test_loader)):
+            inputs = inputs.to(device)
+            targets = targets.to(device)
+
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+
+            val_loss.append(loss.item())
+
+            total += targets.size(0)
+            _, argmax = torch.max(outputs, 1)
+            correct += (argmax == targets).sum().item()
+
+    val_acc = (correct / total * 100)
+    return np.mean(val_loss), val_acc
