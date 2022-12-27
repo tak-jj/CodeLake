@@ -1,5 +1,5 @@
-# 최대공약수
-# greatest common divisor
+# 최대공약수, 유클리드 호제법
+# greatest common divisor, Euclidean algorithm
 
 def gcd(n1, n2):
     if n1 > n2:
