@@ -47,18 +47,15 @@ folder
 -- label
 --- image.png
 '''
-def get_label_dict(path):
-    label_dict = {}
-    for i, label in enumerate(os.listdir(path)):
-        label_dict[label] = i
-    
-    return label_dict
 
 class ImgFolderDataset(Dataset):
     def __init__(self, img_dir, transform=None, target_transform=None):
         self.file_path = glob.glob(os.path.join(img_dir, '*', '*.png'))
         self.transform = transform
         self.target_transform = target_transform
+        self.label_dict = {}
+        for i, dir in enumerate(os.listdir(img_dir)):
+            self.label_dict[dir] = i
 
     def __getitem__(self, index):
         img_path = self.file_path[index]
@@ -66,7 +63,7 @@ class ImgFolderDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         # temp_label = img_path.split('\\')[-2] window 환경, window env
         temp_label = img_path.split('/')[-2]
-        label = label_dict[temp_label]
+        label = self.label_dict[temp_label]
         if self.transform:
             image = self.transform(image)['image']
         if self.target_transform:
@@ -76,3 +73,4 @@ class ImgFolderDataset(Dataset):
     
     def __len__(self):
         return len(self.file_path)
+        
