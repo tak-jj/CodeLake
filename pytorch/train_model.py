@@ -11,8 +11,8 @@ def train_model(model, train_loader, test_loader, criterion, optimizer, num_epoc
     best_model = None
     metric_history = []
 
-    for epoch in range(num_epochs):
-        print(f'Epoch {epoch}/{num_epochs - 1}')
+    for epoch in range(1, num_epochs + 1):
+        print(f'Epoch {epoch}/{num_epochs + 1}')
         model.train()
         train_loss = []
         for inputs, targets in tqdm(iter(train_loader)):
